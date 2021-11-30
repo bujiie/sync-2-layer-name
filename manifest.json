@@ -1,0 +1,7 @@
+{
+  "name": "Sync 2 Layer Name",
+  "id": "1047385898680865561",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "editorType": ["figma"]
+}
