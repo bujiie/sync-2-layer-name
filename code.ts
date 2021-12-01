@@ -1,12 +1,14 @@
 // Recursively finds all text nodes.
-function findTextNodes(node: SceneNode): ReadonlyArray<TextNode> {
+async function findTextNodes(node: SceneNode): Promise<ReadonlyArray<TextNode>> {
     const textNodes = new Array<TextNode>()
     switch (node.type) {
+        // Node types that can have child nodes.
         case "FRAME":
         case "GROUP":
         case "COMPONENT":
         case "COMPONENT_SET":
-            textNodes.push(...node.children.flatMap(n => findTextNodes(n)))
+            const foundTextNodes = await Promise.all(node.children.flatMap(findTextNodes))
+            textNodes.push(...foundTextNodes.flat())
             break;
         case "TEXT":
             textNodes.push(node)
@@ -15,19 +17,23 @@ function findTextNodes(node: SceneNode): ReadonlyArray<TextNode> {
             // ignore all other types of nodes. 
             break;
     }
-    return textNodes
+    return new Promise((resolve, _) => resolve(textNodes))
+}
+
+async function updateTextNode(node: TextNode): Promise<void> {
+    // We load the font async, but we could still avoid some API calls if we
+    // can check if the font is already loaded.
+    if (typeof node.fontName === "object") {
+        await figma.loadFontAsync(node.fontName)
+    }
+    node.characters = node.name
+    return new Promise((resolve, _) => resolve())
 }
 
 (async function () {
     const selectedNodes = figma.currentPage.selection
-
     // We want to recursively find all the text nodes for each selected node.
-    const textNodes: ReadonlyArray<TextNode> = selectedNodes.flatMap(s => findTextNodes(s))
-    for (const textNode of textNodes) {
-        if (typeof textNode.fontName === "object") {
-            await figma.loadFontAsync(textNode.fontName)
-        }
-        textNode.characters = textNode.name
-    }
+    const textNodes = await Promise.all(selectedNodes.flatMap(findTextNodes))
+    await Promise.all(textNodes.flat().map(updateTextNode))
     figma.closePlugin()
 })()
